@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title></title>
+	</head>
+	<body>
+	
+		<embed height="415" width="544" quality="high" allowfullscreen="true" type="application/x-shockwave-flash" src="//static.hdslb.com/miniloader.swf" flashvars="aid=13458420&page=1" pluginspage="//www.adobe.com/shockwave/download/download.cgi?P1_Prod_Version=ShockwaveFlash"></embed>
+<script>
+var t = 1000;	
+var b = parseInt(1000/3);
+alert(b*3)
+	
+/**
+ * Created by Joe on 16/5/18.
+ */
+//初始化
+var tiaoBa = angular.module('tiaoBa', ['ui.router', 'ngCookies', 'ngSanitize', 'ngTouch']);
+
+/**
+ * 全局配置
+ */
+tiaoBa.factory('$tiaoBaConfig', [function()
+{
+    var self =
+    {
+        //接口请求地址
+        //测试环境
+        requestUrl   : 'http://api.tiaooo.com/',
+        //商城
+        requestShopUrl : 'http://api.tiaooo.com/tshop/',
+        //cookie前辍
+        cookieBefore : 'Tiao',
+        //登陆保存时间
+        loginExpires : (new Date()).getTime() + (60 * 60 * 1000 * 24 * 7),
+
+        //数据分页配置
+        dataPage     : {
+            //每页条数
+            pageSize  : 20,
+            //页码块左右显示个数
+            pageNumer : 3
+        },
+
+        //banner社区分类
+        bannerType : [
+            {
+                id    : '9000',
+                pid   : 0,
+                title : '圈子',
+                sort  : 9999,
+                subtype : [
+                    {
+                        id : '9001',
+                        title : '主页',
+                        pid   : '9000',
+                        sort  : 1
+                    }
+                ]
+            }
+        ],
+
+        //视频根地址
+        videoUrl : 'http://v.tiaooo.com/',
+
+        //图片根地址
+        imageUrl : 'http://7u2ovi.com1.z0.glb.clouddn.com/',
+        //头像根地址
+        faceUrl  : 'http://7xi41q.com1.z0.glb.clouddn.com/'
+    };
+    return self;
+}]);
+
+
+/**
+ * Ajax请求服务
+ */
+tiaoBa.factory('$ajax', ['$http', '$tiaoBaConfig', '$log', '$httpParamSerializer', '$loading', function($http, $tiaoBaConfig, $log, $httpParamSerializer, $loading)
+{
+    var self =
+    {
+        //请求队列缓存
+        queueCache : [],
+
+        //接口参数
+        para : {},
+
+        setPara : function(para)
+        {
+            /*var user;
+            if (user = $userNative.get('user'))
+            {
+                para.openid  = user.openid;
+                para.apptoken = user.apptoken;
+            }*/
+            self.para = angular.extend({}, para);
+        },
+
+        //获取完整URL
+        getUrl : function()
+        {
+            if (typeof self.para != 'object') return false;
+
+            var string = '', comm = '', reg = /^[0-9a-zA-Z]+$/;
+            for (var i in self.para)
+            {
+                string += comm + self.para[i];
+
+                comm = '/';
+                /*
+                //如果中文或特殊字符，编码传送
+                if (!reg.test(self.para[i]))
+                {
+                    string += comm + i + '=' + encodeURIComponent(encodeURIComponent(self.para[i]));
+                }
+                else string += comm + i + '=' + self.para[i];
+
+                comm = '&';*/
+            }
+
+            if (self.para.c == 'shop/index')
+            {
+                return $tiaoBaConfig.requestShopUrl + string;
+            }
+            else
+            {
+                return $tiaoBaConfig.requestUrl + string;
+            }
+        },
+
+        queueCacheCheck : function(url)
+        {
+            if (self.queueCache[url])
+            {
+                $log.error('重复的请求, url : ' + url);
+                return true;
+            }
+
+            self.queueCache[url] = true;
+
+            return false;
+        },
+
+        //get请求
+        get : function(para, success, error)
+        {
+            if (typeof para == 'object')
+            {
+                self.setPara(para);
+            }
+            if (!self.para.d || !self.para.c || !self.para.m)
+            {
+                $log.error('缺少必须参数.');
+                return false;
+            }
+
+            var url = self.getUrl(); //console.log(url);
+
+            if (self.queueCacheCheck(url))
+            {
+                return false;
+            }
+
+            $http.get(url, {'Content-Type':'application/x-www-form-urlencoded'})
+                .success(function(response)
+                {
+                    if (response.status == 1)
+                    {
+                        if (angular.isFunction(success))
+                        {
+                            success(response);
+                        }
+                        else console.log(response);
+                    }
+                    else
+                    {
+                        $loading.show(response.message);
+                    }
+                    self.queueCache[url] = false;
+                }).error(function(response, status)
+            {
+                if (angular.isFunction(error))
+                {
+                    error();
+                }
+                self.queueCache[url] = false;
+                self.error(response, status);
+            });
+        },
+
+        post : function(para, data, success, error)
+        {
+            if (angular.isObject(para))
+            {
+                self.setPara(para);
+            }
+            else if (angular.isString(para))
+            {
+                self.setPara({m : para});
+            }
+
+            var url = self.getUrl(); //console.log(url);
+
+            if (self.queueCacheCheck(url))
+            {
+                return false;
+            }
+
+            $http({
+                method: 'POST',
+                url: url,
+                data : $httpParamSerializer(data),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                    // 'Authorization' : 'tshop-web'
+                }
+            }).then(function successCallback(response)
+            {
+                if (response.data.status == 1)
+                {
+                    $loading.hide();
+                    if (angular.isFunction(success))
+                    {
+                        success(response.data);
+                    }
+                    else console.log(response);
+                }
+                else
+                {
+                    $loading.show(response.data.message, 1800);
+                }
+                //console.log(response);
+                self.queueCache[url] = false;
+            }, function errorCallback(response) {
+                if (angular.isFunction(error))
+                {
+                    error();
+                }
+                self.queueCache[url] = false;
+                self.error(response, response.status);
+            });
+        },
+        error : function(response, status)
+        {
+            $loading.show('请求失败');
+            console.log(response);
+            /*
+            if (angular.isObject(response.data))
+            {
+                $loading.show(response.data.message);
+            }
+            else
+            {
+                $loading.show(response.data);
+            }*/
+        }
+    };
+    return self;
+}]);
+
+/**
+ * loading服务
+ */
+tiaoBa.factory('$loading', ['$rootScope', '$timeout', function($rootScope, $timeout)
+{
+    var self =
+    {
+        timer : null,
+
+        show : function(text, time, callback)
+        {
+            if (self.timer !== null)
+            {
+                $timeout.cancel(self.timer);
+            }
+
+            var data = {loadingShow : true};
+
+            $rootScope.loadingShow = true;
+
+            if (angular.isString(text))
+            {
+                data.ladingTitle = text;
+            }
+            else
+            {
+                data.ladingTitle = 'Loading...';
+            }
+            $rootScope.$emit('requestSynchLoading', data);
+
+            time = angular.isNumber(text) ? text : (time ? time : 2500);
+
+            if (text !== true && time !== true)
+            {
+                self.timer = $timeout(function()
+                {
+                    self.hide();
+
+                    if (angular.isFunction(callback))
+                    {
+                        callback();
+                    }
+                }, time);
+            }
+        },
+
+        hide : function()
+        {
+            $rootScope.$emit('requestSynchLoading', {loadingShow : false});
+        }
+    };
+    return self;
+}]);
+</script>
+	</body>
+</html>
